@@ -10,29 +10,36 @@ export const authenticate = (
   req: AuthRequest,
   res: Response,
   next: NextFunction
-) => {
+): void => {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "No token provided" });
+  if (!authHeader?.startsWith("Bearer ")) {
+    res.status(401).json({ message: "No token provided" });
+    return;
   }
 
-  const token = authHeader.split(" ")[1];
+  const token = authHeader.slice("Bearer ".length).trim();
+
+  if (!token) {
+    res.status(401).json({ message: "No token provided" });
+    return;
+  }
 
   try {
-    const decoded = verifyToken(token);
-    req.user = decoded;
+    req.user = verifyToken(token);
     next();
-  } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired token" });
+  } catch {
+    res.status(401).json({ message: "Invalid or expired token" });
   }
 };
 
 export const authorize = (...roles: Array<"user" | "admin">) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user || !roles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Access forbidden: insufficient role" });
+      res.status(403).json({ message: "Access forbidden: insufficient role" });
+      return;
     }
+
     next();
   };
 };

@@ -1,7 +1,4 @@
 import mysql from "mysql2/promise";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 export const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -14,13 +11,17 @@ export const pool = mysql.createPool({
   queueLimit: 0,
 });
 
-export const testConnection = async () => {
+export const testConnection = async (): Promise<void> => {
+  let connection: mysql.PoolConnection | undefined;
+
   try {
-    const conn = await pool.getConnection();
+    connection = await pool.getConnection();
+    await connection.ping();
     console.log("MySQL connected successfully");
-    conn.release();
-  } catch (err) {
-    console.error("MySQL connection failed:", err);
-    process.exit(1);
+  } catch (error) {
+    console.error("MySQL connection failed:", error);
+    throw error;
+  } finally {
+    connection?.release();
   }
 };
