@@ -2,11 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Makes the application responsive on mobile devices. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <!-- Browser tab title. -->
     <title>Job Application Tracker</title>
+
+    <!-- Short description for search engines and link previews. -->
+    <meta
+      name="description"
+      content="Track job applications, interviews, statuses, and your overall job search progress."
+    />
   </head>
+
   <body>
+    <!-- React mounts the entire application inside this element. -->
     <div id="root"></div>
+
+    <!-- Vite loads the React entry point from here. -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
