@@ -1,21 +1,9 @@
-// React hooks.
-// useEffect → loads applications when the page opens or showAll changes.
-// useMemo → efficiently calculates filtered and sorted applications.
 import React, { useEffect, useMemo, useState } from "react";
-
-// Link lets us navigate between pages without reloading the application.
 import { Link } from "react-router-dom";
-
-// Axios instance configured for our backend API.
 import api from "../api/axios";
-
-// TypeScript type describing an application.
 import { Application } from "../types";
-
-// Gives us access to the currently logged-in user.
 import { useAuth } from "../context/AuthContext";
 
-// Available sorting options for the applications list.
 type SortOption =
   | "newest"
   | "oldest"
@@ -24,7 +12,6 @@ type SortOption =
   | "job-asc"
   | "job-desc";
 
-// Converts an unknown API error into a useful message for the UI.
 const getErrorMessage = (error: unknown, fallback: string) => {
   if (typeof error === "object" && error !== null && "response" in error) {
     const response = (
@@ -45,50 +32,47 @@ const getErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
+const formatStatus = (status: Application["status"]) => {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
+
+const formatDate = (value: string) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString();
+};
+
 const Applications = () => {
-  // Stores the applications received from the backend.
   const [applications, setApplications] = useState<Application[]>([]);
-
-  // Controls the loading state while data is being fetched.
   const [loading, setLoading] = useState(true);
-
-  // Admins can switch between their own applications and all users'
-  // applications.
   const [showAll, setShowAll] = useState(false);
-
-  // Search text entered by the user.
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Selected status filter.
   const [statusFilter, setStatusFilter] = useState<
     Application["status"] | "all"
   >("all");
-
-  // Controls the order of applications in the table.
-  const [sortOption, setSortOption] = useState<SortOption>("newest");
-
-  // Stores an API error that should be shown to the user.
+  const [sortOption, setSortOption] =
+    useState<SortOption>("newest");
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] =
+    useState<number | null>(null);
 
-  // Stores which application is currently being deleted.
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  // Gets the logged-in user from our authentication context.
   const { user } = useAuth();
 
-  // Fetch applications from the backend.
   const fetchData = async () => {
     setLoading(true);
     setError("");
 
     try {
-      // The backend supports ?all=true for admins.
-      // Normal users only receive their own applications.
-      const endpoint = `/applications${showAll ? "?all=true" : ""}`;
+      const endpoint = `/applications${
+        showAll ? "?all=true" : ""
+      }`;
 
       const response = await api.get(endpoint);
 
-      // Store the backend response in React state.
       setApplications(response.data);
     } catch (err: unknown) {
       setError(
@@ -98,24 +82,18 @@ const Applications = () => {
         )
       );
     } finally {
-      // This runs whether the request succeeds or fails.
       setLoading(false);
     }
   };
 
-  // Load applications when the page opens.
-  // Admins also trigger another request when Show All changes.
   useEffect(() => {
     void fetchData();
 
     // fetchData depends on showAll.
-    // We intentionally control this effect using showAll.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showAll]);
 
-  // Delete an application.
   const handleDelete = async (id: number) => {
-    // Confirmation protects against accidental deletion.
     const confirmed = window.confirm(
       "Are you sure you want to delete this application?"
     );
@@ -128,13 +106,12 @@ const Applications = () => {
     setDeletingId(id);
 
     try {
-      // Delete the application from the database.
       await api.delete(`/applications/${id}`);
 
-      // Remove it from local state immediately.
-      // This avoids making another GET request.
       setApplications((previous) =>
-        previous.filter((application) => application.id !== id)
+        previous.filter(
+          (application) => application.id !== id
+        )
       );
     } catch (err: unknown) {
       setError(
@@ -148,20 +125,16 @@ const Applications = () => {
     }
   };
 
-  /*
-   * Search, filtering and sorting happen on the data already loaded
-   * from the backend.
-   *
-   * useMemo avoids repeating this calculation when unrelated state
-   * changes, such as deleting/loading state.
-   */
   const visibleApplications = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedSearch =
+      searchTerm.trim().toLowerCase();
 
-    // First filter the applications.
     const filtered = applications.filter((application) => {
-      const companyName = application.company_name.toLowerCase();
-      const jobTitle = application.job_title.toLowerCase();
+      const companyName =
+        application.company_name.toLowerCase();
+
+      const jobTitle =
+        application.job_title.toLowerCase();
 
       const matchesSearch =
         !normalizedSearch ||
@@ -175,7 +148,6 @@ const Applications = () => {
       return matchesSearch && matchesStatus;
     });
 
-    // Then sort the filtered applications.
     return [...filtered].sort((a, b) => {
       switch (sortOption) {
         case "newest":
@@ -191,10 +163,14 @@ const Applications = () => {
           );
 
         case "company-asc":
-          return a.company_name.localeCompare(b.company_name);
+          return a.company_name.localeCompare(
+            b.company_name
+          );
 
         case "company-desc":
-          return b.company_name.localeCompare(a.company_name);
+          return b.company_name.localeCompare(
+            a.company_name
+          );
 
         case "job-asc":
           return a.job_title.localeCompare(b.job_title);
@@ -206,22 +182,24 @@ const Applications = () => {
           return 0;
       }
     });
-  }, [applications, searchTerm, statusFilter, sortOption]);
+  }, [
+    applications,
+    searchTerm,
+    statusFilter,
+    sortOption,
+  ]);
 
-  // Reset search, filtering and sorting controls.
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
     setSortOption("newest");
   };
 
-  // Used to decide whether the Clear Filters button is needed.
   const hasActiveFilters =
     searchTerm.trim() !== "" ||
     statusFilter !== "all" ||
     sortOption !== "newest";
 
-  // Initial loading state.
   if (loading) {
     return (
       <div className="page-loading">
@@ -231,26 +209,29 @@ const Applications = () => {
   }
 
   return (
-    <div className="page">
-      {/* --------------------------------------------------------
-          PAGE HEADER
-          -------------------------------------------------------- */}
-      <div className="page-header">
-        <div>
+    <div className="page applications-page">
+
+      {/* ======================================================
+          HEADER
+          ====================================================== */}
+
+      <header className="applications-header">
+        <div className="applications-header-content">
+          <span className="applications-eyebrow">
+            JOB SEARCH
+          </span>
+
           <h1>Applications</h1>
 
-          <p className="subtitle">
-            {visibleApplications.length} of {applications.length}{" "}
-            {applications.length === 1
-              ? "application"
-              : "applications"}
+          <p className="applications-description">
+            Manage and track every job application in one place.
           </p>
         </div>
 
-        <div className="page-header-actions">
-          {/* Only admins can request applications from all users. */}
+        <div className="applications-header-actions">
+
           {user?.role === "admin" && (
-            <label className="checkbox-label">
+            <label className="applications-admin-toggle">
               <input
                 type="checkbox"
                 checked={showAll}
@@ -259,21 +240,19 @@ const Applications = () => {
                 }
               />
 
-              Show all users' applications
+              <span>Show all users</span>
             </label>
           )}
 
-          {/* Allows the user to manually reload backend data. */}
           <button
             type="button"
             className="btn btn-secondary"
             onClick={fetchData}
-            disabled={loading || deletingId !== null}
+            disabled={deletingId !== null}
           >
             Refresh
           </button>
 
-          {/* Main page action. */}
           <Link
             to="/applications/new"
             className="btn btn-primary"
@@ -281,108 +260,180 @@ const Applications = () => {
             + Add Application
           </Link>
         </div>
-      </div>
+      </header>
 
-      {/* API errors should be visible instead of only appearing
-          in the browser console. */}
+      {/* ======================================================
+          ERROR
+          ====================================================== */}
+
       {error && (
         <div className="error-banner" role="alert">
           {error}
         </div>
       )}
 
-      {/* --------------------------------------------------------
-          SEARCH / FILTER / SORT
-          -------------------------------------------------------- */}
+      {/* ======================================================
+          SUMMARY
+          ====================================================== */}
+
+      <section className="applications-summary">
+
+        <div className="applications-summary-main">
+          <span className="applications-summary-label">
+            Total applications
+          </span>
+
+          <strong className="applications-summary-count">
+            {applications.length}
+          </strong>
+        </div>
+
+        <div className="applications-summary-result">
+          Showing{" "}
+          <strong>{visibleApplications.length}</strong>{" "}
+          of{" "}
+          <strong>{applications.length}</strong>
+        </div>
+
+      </section>
+
+      {/* ======================================================
+          FILTERS
+          ====================================================== */}
+
       {applications.length > 0 && (
-        <section className="card-form" aria-label="Application filters">
-          <h2>Find Applications</h2>
+        <section
+          className="applications-toolbar"
+          aria-label="Application filters"
+        >
 
-          <label htmlFor="application-search">
-            Search
-          </label>
+          <div className="applications-search">
+            <label htmlFor="application-search">
+              Search applications
+            </label>
 
-          <input
-            id="application-search"
-            type="search"
-            value={searchTerm}
-            onChange={(event) =>
-              setSearchTerm(event.target.value)
-            }
-            placeholder="Search by company or job title..."
-          />
+            <input
+              id="application-search"
+              type="search"
+              value={searchTerm}
+              onChange={(event) =>
+                setSearchTerm(event.target.value)
+              }
+              placeholder="Search company or job title..."
+            />
+          </div>
 
-          <label htmlFor="status-filter">
-            Filter by Status
-          </label>
+          <div className="applications-filter">
+            <label htmlFor="status-filter">
+              Status
+            </label>
 
-          <select
-            id="status-filter"
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(
-                event.target.value as
-                  | Application["status"]
-                  | "all"
-              )
-            }
-          >
-            <option value="all">All Statuses</option>
-            <option value="applied">Applied</option>
-            <option value="interviewing">
-              Interviewing
-            </option>
-            <option value="offer">Offer</option>
-            <option value="rejected">Rejected</option>
-            <option value="withdrawn">Withdrawn</option>
-          </select>
+            <select
+              id="status-filter"
+              value={statusFilter}
+              onChange={(event) =>
+                setStatusFilter(
+                  event.target.value as
+                    | Application["status"]
+                    | "all"
+                )
+              }
+            >
+              <option value="all">
+                All statuses
+              </option>
 
-          <label htmlFor="sort-applications">
-            Sort By
-          </label>
+              <option value="applied">
+                Applied
+              </option>
 
-          <select
-            id="sort-applications"
-            value={sortOption}
-            onChange={(event) =>
-              setSortOption(event.target.value as SortOption)
-            }
-          >
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-            <option value="company-asc">
-              Company A → Z
-            </option>
-            <option value="company-desc">
-              Company Z → A
-            </option>
-            <option value="job-asc">
-              Job title A → Z
-            </option>
-            <option value="job-desc">
-              Job title Z → A
-            </option>
-          </select>
+              <option value="interviewing">
+                Interviewing
+              </option>
+
+              <option value="offer">
+                Offer
+              </option>
+
+              <option value="rejected">
+                Rejected
+              </option>
+
+              <option value="withdrawn">
+                Withdrawn
+              </option>
+            </select>
+          </div>
+
+          <div className="applications-filter">
+            <label htmlFor="sort-applications">
+              Sort by
+            </label>
+
+            <select
+              id="sort-applications"
+              value={sortOption}
+              onChange={(event) =>
+                setSortOption(
+                  event.target.value as SortOption
+                )
+              }
+            >
+              <option value="newest">
+                Newest first
+              </option>
+
+              <option value="oldest">
+                Oldest first
+              </option>
+
+              <option value="company-asc">
+                Company A → Z
+              </option>
+
+              <option value="company-desc">
+                Company Z → A
+              </option>
+
+              <option value="job-asc">
+                Job title A → Z
+              </option>
+
+              <option value="job-desc">
+                Job title Z → A
+              </option>
+            </select>
+          </div>
 
           {hasActiveFilters && (
             <button
               type="button"
-              className="btn btn-secondary"
+              className="btn btn-secondary applications-clear-button"
               onClick={clearFilters}
             >
-              Clear Filters
+              Clear filters
             </button>
           )}
+
         </section>
       )}
 
-      {/* --------------------------------------------------------
-          EMPTY STATES
-          -------------------------------------------------------- */}
+      {/* ======================================================
+          EMPTY DATABASE
+          ====================================================== */}
 
-      {/* No applications exist in the database. */}
       {applications.length === 0 ? (
-        <div className="empty-state">
+
+        <section className="applications-empty-state">
+
+          <div className="applications-empty-icon">
+            +
+          </div>
+
+          <span className="applications-empty-eyebrow">
+            GET STARTED
+          </span>
+
           <h2>No applications yet</h2>
 
           <p>
@@ -396,11 +447,25 @@ const Applications = () => {
           >
             + Add Your First Application
           </Link>
-        </div>
+
+        </section>
+
       ) : visibleApplications.length === 0 ? (
-        /* Applications exist, but the current filters found
-           no matching results. */
-        <div className="empty-state">
+
+        /* ====================================================
+           NO FILTER RESULTS
+           ==================================================== */
+
+        <section className="applications-empty-state">
+
+          <div className="applications-empty-icon">
+            ?
+          </div>
+
+          <span className="applications-empty-eyebrow">
+            NO RESULTS
+          </span>
+
           <h2>No matching applications</h2>
 
           <p>
@@ -412,96 +477,157 @@ const Applications = () => {
             className="btn btn-secondary"
             onClick={clearFilters}
           >
-            Clear Filters
+            Clear filters
           </button>
-        </div>
+
+        </section>
+
       ) : (
-        /* ------------------------------------------------------
+
+        /* ====================================================
            APPLICATION TABLE
-           ------------------------------------------------------ */
+           ==================================================== */
 
-        /*
-         * table-wrapper provides horizontal scrolling on small
-         * screens so the table remains usable on mobile.
-         */
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Company</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Applied On</th>
-                <th>Job Link</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+        <section className="applications-table-card">
 
-            <tbody>
-              {visibleApplications.map((application) => (
-                <tr key={application.id}>
-                  <td>
-                    <strong>
-                      {application.company_name}
-                    </strong>
-                  </td>
+          <div className="applications-table-header">
 
-                  <td>{application.job_title}</td>
+            <div>
+              <span className="applications-table-eyebrow">
+                APPLICATIONS
+              </span>
 
-                  <td>
-                    <span
-                      className={`badge badge-${application.status}`}
-                    >
-                      {application.status}
-                    </span>
-                  </td>
+              <h2>Your applications</h2>
 
-                  <td>
-                    {new Date(
-                      application.applied_date
-                    ).toLocaleDateString()}
-                  </td>
+              <p>
+                Review your applications and manage their
+                current status.
+              </p>
+            </div>
 
-                  <td>
-                    {application.job_link ? (
-                      <a
-                        href={application.job_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        View Job
-                      </a>
-                    ) : (
-                      <span>—</span>
-                    )}
-                  </td>
+            <span className="applications-table-count">
+              {visibleApplications.length}{" "}
+              {visibleApplications.length === 1
+                ? "application"
+                : "applications"}
+            </span>
 
-                  <td className="table-actions">
-                    <Link
-                      to={`/applications/${application.id}`}
-                    >
-                      Edit
-                    </Link>
+          </div>
 
-                    <button
-                      type="button"
-                      className="link-btn"
-                      onClick={() =>
-                        handleDelete(application.id)
-                      }
-                      disabled={deletingId !== null}
-                    >
-                      {deletingId === application.id
-                        ? "Deleting..."
-                        : "Delete"}
-                    </button>
-                  </td>
+          <div className="table-wrapper">
+
+            <table className="table applications-table">
+
+              <thead>
+                <tr>
+                  <th>Company</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Applied</th>
+                  <th>Job</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+
+              <tbody>
+
+                {visibleApplications.map(
+                  (application) => (
+                    <tr key={application.id}>
+
+                      <td>
+                        <div className="application-company">
+                          <strong>
+                            {application.company_name}
+                          </strong>
+                        </div>
+                      </td>
+
+                      <td>
+                        <span className="application-role">
+                          {application.job_title}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span
+                          className={`badge badge-${application.status}`}
+                        >
+                          {formatStatus(
+                            application.status
+                          )}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className="application-date">
+                          {formatDate(
+                            application.applied_date
+                          )}
+                        </span>
+                      </td>
+
+                      <td>
+                        {application.job_link ? (
+                          <a
+                            className="application-job-link"
+                            href={application.job_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            View job ↗
+                          </a>
+                        ) : (
+                          <span className="application-no-link">
+                            —
+                          </span>
+                        )}
+                      </td>
+
+                      <td>
+                        <div className="application-actions">
+
+                          <Link
+                            className="application-view-link"
+                            to={`/applications/${application.id}`}
+                          >
+                            View / Edit
+                          </Link>
+
+                          <button
+                            type="button"
+                            className="application-delete-button"
+                            onClick={() =>
+                              handleDelete(
+                                application.id
+                              )
+                            }
+                            disabled={
+                              deletingId !== null
+                            }
+                          >
+                            {deletingId ===
+                            application.id
+                              ? "Deleting..."
+                              : "Delete"}
+                          </button>
+
+                        </div>
+                      </td>
+
+                    </tr>
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </section>
       )}
+
     </div>
   );
 };
